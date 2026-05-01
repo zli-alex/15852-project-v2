@@ -1,3 +1,6 @@
 [submodule "paylaylib"]
 	path = paylaylib
 	url = https://github.com/cmuparlay/parlaylib.git
+[submodule "parlaylib"]
+	path = parlaylib
+	url = https://github.com/cmuparlay/parlaylib.git
