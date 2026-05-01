@@ -386,7 +386,6 @@ struct DynamicGraphColoring {
     // v enters S with probability (d_old - d_new) / (Delta+1 - d_new).
     parlay::random_generator gen((size_t)(global_time.load() + 777UL));
     auto in_S_flags = parlay::tabulate(m_aff, [&](long i) -> bool {
-      vertex v = affected[i];
       int old_d = d_le_old[i], new_d = d_le_new[i];
       if (old_d <= new_d) return false; // d_<= did not decrease
       int k     = old_d - new_d;

@@ -1,4 +1,5 @@
 #include <iostream>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -60,14 +61,16 @@ static bool full_check(const std::string& label,
 }
 
 // Build a graph and DGC from an explicit edge list.
-static std::pair<graph, DynamicGraphColoring>
+// Returns (G, unique_ptr<DGC>) so that the DGC (which contains
+// std::atomic and is therefore non-movable) lives on the heap.
+static std::pair<graph, std::unique_ptr<DynamicGraphColoring>>
 make_and_color(const std::string& label,
                int n, int Delta,
                const edges& edge_list) {
   graph G = utils::symmetrize(edge_list, n);
-  DynamicGraphColoring dgc(n, Delta);
-  dgc.add_edge_batch(edge_list);
-  full_check(label, G, dgc);
+  auto dgc = std::make_unique<DynamicGraphColoring>(n, Delta);
+  dgc->add_edge_batch(edge_list);
+  full_check(label, G, *dgc);
   return {std::move(G), std::move(dgc)};
 }
 
@@ -206,10 +209,10 @@ static void test_delete_path() {
 
   // Delete edge (4,5) — splits into two sub-paths.
   edges del = {{4, 5}};
-  dgc.delete_edge_batch(del);
+  dgc->delete_edge_batch(del);
   edges remaining;
   for (auto& e : E) if (!(e == edge{4,5})) remaining.push_back(e);
-  check_after_delete("P10 after deleting (4,5)", dgc, n, remaining);
+  check_after_delete("P10 after deleting (4,5)", *dgc, n, remaining);
 }
 
 static void test_delete_cycle() {
@@ -219,9 +222,9 @@ static void test_delete_cycle() {
   auto [G, dgc] = make_and_color("C8 before delete", n, Delta, E);
 
   edges del = {{7, 0}};
-  dgc.delete_edge_batch(del);
+  dgc->delete_edge_batch(del);
   auto remaining = make_path(n); // 0-1-2-...-7
-  check_after_delete("C8 after deleting (7,0)", dgc, n, remaining);
+  check_after_delete("C8 after deleting (7,0)", *dgc, n, remaining);
 }
 
 static void test_delete_clique() {
@@ -231,10 +234,10 @@ static void test_delete_clique() {
   auto [G, dgc] = make_and_color("K5 before delete", n, Delta, E);
 
   edges del = {{0, 1}};
-  dgc.delete_edge_batch(del);
+  dgc->delete_edge_batch(del);
   edges remaining;
   for (auto& e : E) if (!(e == edge{0,1})) remaining.push_back(e);
-  check_after_delete("K5 after deleting (0,1)", dgc, n, remaining);
+  check_after_delete("K5 after deleting (0,1)", *dgc, n, remaining);
 }
 
 static void test_empty_graph() {
