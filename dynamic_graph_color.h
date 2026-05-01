@@ -134,36 +134,43 @@ struct DynamicGraphColoring {
   // --------------------------------------------------------------
   void sample_from_palette(vertex v, parlay::random_generator& rng) {
     int lv = level[v];
+    const auto& nbrs = adj[v];
 
-    // Step 1: collect colors used by lower/equal-level colored neighbors
+    // Step 1: collect colors used by lower/equal-level colored neighbors.
+    // Use a flat bitset sized Delta+1 to avoid heap allocation per call.
     std::vector<bool> used(Delta + 1, false);
-    for (vertex w : adj[v]) {
+    for (vertex w : nbrs) {
       if (level[w] <= lv) {
-        int cw = color[w]; // -1 if w is in S (uncolored), otherwise valid
+        int cw = color[w];
         if (cw >= 0) used[cw] = true;
       }
     }
 
-    // Step 2: build explicit list of free colors (= Uv)
+    // Step 2: build explicit list of free colors (= Uv).
+    // Preallocate to avoid repeated growth; reserve is O(1) amortized.
     std::vector<int> free_colors;
     free_colors.reserve(Delta + 1);
     for (int c = 0; c <= Delta; c++) {
       if (!used[c]) free_colors.push_back(c);
     }
-    // |Uv| >= Delta+1 - d_<=(v) >= 1, so free_colors is never empty.
 
-    // Step 3: rejection-sample from Pv (subset of Uv with |Pv| >= |Uv|/2)
+    // Step 3: rejection-sample from Pv.
+    // Count hi-level usages per free color in one pass (avoids a second
+    // O(degree) scan per rejection); store counts in the same `used` space.
+    // We repurpose `used` as a count array capped at 2 (we only need <=1).
+    std::fill(used.begin(), used.end(), false);
+    std::vector<int> hi_count(Delta + 1, 0);
+    for (vertex w : nbrs) {
+      if (level[w] > lv) {
+        int cw = color[w];
+        if (cw >= 0 && hi_count[cw] < 2) hi_count[cw]++;
+      }
+    }
+
+    // |Pv| >= |Uv|/2 by Observation 3.7, so expected 2 trials.
     while (true) {
       int c = free_colors[rng() % free_colors.size()];
-
-      // Count higher-level neighbors that have color c (palette condition)
-      int hi_count = 0;
-      for (vertex w : adj[v]) {
-        if (level[w] > lv && color[w] == c) {
-          if (++hi_count > 1) break;
-        }
-      }
-      if (hi_count <= 1) {
+      if (hi_count[c] <= 1) {
         color[v] = c;
         return;
       }
@@ -203,12 +210,13 @@ struct DynamicGraphColoring {
       });
 
       // ── Phase 2: sample from palette in parallel (lines 6-7) ────
-      // Each vertex gets an independent sub-generator.
+      // grain_size=1 gives maximum parallelism; keep at 1 since each
+      // call is O(Delta) — heavy enough to amortise task overhead.
       parlay::parallel_for(0, sz, [&](long i) {
         vertex v = S[i];
         auto rng = gen[(size_t)(round * n + v)];
         sample_from_palette(v, rng);
-      });
+      }, /*grain_size=*/1);
 
       // ── Phase 3: detect S-S conflicts (lines 8-12) ───────────────
       // For each v in S, scan NB>=(v) ∩ S for a color match.

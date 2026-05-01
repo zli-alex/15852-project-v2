@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <iostream>
 #include <string>
 #include <vector>
@@ -82,8 +83,18 @@ static void bench_batch_size(long n, long m_approx, int runs) {
                               [](edge e){ return e.first < e.second; });
   long m = (long)E_all.size();
 
-  // Batch sizes to test: 1, 10, 100, 1000, 10000, all-at-once.
-  std::vector<long> batch_sizes = {1, 10, 100, 1000, 10000, m};
+  // Batch sizes to test: adaptive to m so the smallest batch is at
+  // most m/1000 (avoids millions of scheduler-startup overheads that
+  // would stall for hours on large graphs).
+  long min_bs = std::max(1L, m / 1000);
+  std::vector<long> batch_sizes;
+  for (long bs : {1L, 10L, 100L, 1000L, 10000L, 100000L}) {
+    if (bs >= min_bs) batch_sizes.push_back(bs);
+  }
+  batch_sizes.push_back(m); // always include all-at-once
+  // Deduplicate.
+  batch_sizes.erase(std::unique(batch_sizes.begin(), batch_sizes.end()),
+                    batch_sizes.end());
 
   for (long bs : batch_sizes) {
     if (bs > m) bs = m;
@@ -169,7 +180,14 @@ static void bench_delete_batch_size(long n, long m_approx, int runs) {
                               [](edge e){ return e.first < e.second; });
   long m = (long)E_all.size();
 
-  std::vector<long> batch_sizes = {10, 100, 1000, 10000, m};
+  long min_bs_d = std::max(1L, m / 1000);
+  std::vector<long> batch_sizes;
+  for (long bs : {10L, 100L, 1000L, 10000L, 100000L}) {
+    if (bs >= min_bs_d) batch_sizes.push_back(bs);
+  }
+  batch_sizes.push_back(m);
+  batch_sizes.erase(std::unique(batch_sizes.begin(), batch_sizes.end()),
+                    batch_sizes.end());
 
   for (long bs : batch_sizes) {
     if (bs > m) bs = m;
