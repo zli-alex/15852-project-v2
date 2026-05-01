@@ -82,6 +82,14 @@ bench_dynamic: bench/bench_dynamic.cpp $(HDRS)
 # Convenience: build all benchmarks.
 bench: bench_static bench_dynamic
 
+# Sweep thread counts for every graph under data/*.txt (SNAP edge lists).
+# Usage:  make bench_snap_sweep
+#          DATA_DIR=./snap_data RUNS=5 make bench_snap_sweep
+bench_snap_sweep: bench_static
+	bash bench/bench_snap_data_sweep.sh \
+	  "$(if $(strip $(DATA_DIR)),$(DATA_DIR),data)" \
+	  "$(if $(strip $(RUNS)),$(RUNS),3)"
+
 # ── Clean ────────────────────────────────────────────────────────
 clean:
 	rm -f $(TARGET) $(TARGET)_debug \
@@ -90,4 +98,4 @@ clean:
 
 .PHONY: all debug run run_debug clean \
         test_small test_snap test_stress test \
-        bench_static bench_dynamic bench
+        bench_static bench_dynamic bench bench_snap_sweep

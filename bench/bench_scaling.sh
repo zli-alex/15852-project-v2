@@ -100,6 +100,11 @@ for t in $THREADS; do
       key="${kv%%=*}"; val="${kv#*=}"
       fields[$key]="$val"
     done
+    # bench_static prints time_s=...; dynamic bench uses total_time_s / avg_time_s.
+    [[ -z "${fields[avg_time_s]:-}" && -n "${fields[time_s]:-}" ]] \
+      && fields[avg_time_s]="${fields[time_s]}"
+    [[ -z "${fields[total_time_s]:-}" && -n "${fields[time_s]:-}" ]] \
+      && fields[total_time_s]="${fields[time_s]}"
     printf '%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n' \
       "${fields[scenario]:-}"     \
       "${fields[algo]:-}"         \

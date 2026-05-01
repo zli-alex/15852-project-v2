@@ -15,6 +15,9 @@ Dependencies:
 The CSV format (written by bench_scaling.sh) has columns:
   scenario, algo, threads, n, m, Delta, batch_size,
   runs, total_time_s, avg_time_s, avg_rounds, avg_colors
+
+bench_snap_data_sweep.sh adds an optional leading column:
+  graph_file  —  basename of the SNAP file (combined results_snap_all.csv)
 """
 
 import sys
@@ -178,16 +181,33 @@ def process_file(path: str):
     if "threads" in df.columns and df["threads"].nunique() > 1:
         group_cols = ["threads"]
         label_col  = None
-        if has_scenario: group_cols.insert(0, "scenario"); label_col = "scenario"
-        if has_algo:     group_cols.insert(0, "algo");     label_col = "algo"
+        has_graph = "graph_file" in df.columns and df["graph_file"].notna().any()
+        multi_graph = has_graph and df["graph_file"].nunique() > 1
+        if has_graph:
+            group_cols.insert(0, "graph_file")
+        if has_scenario:
+            group_cols.insert(0, "scenario")
+            if label_col is None and not multi_graph:
+                label_col = "scenario"
+        if has_algo:
+            group_cols.insert(0, "algo")
+            if label_col is None and not multi_graph:
+                label_col = "algo"
         group_cols.append("n")
 
         sp = speedup_table(df, group_cols)
         if not sp.empty:
             print("\n-- Speedup table --")
             print(sp.to_string(index=False))
-            if HAS_MPL and label_col:
-                plot_speedup(sp, label_col,
+            if HAS_MPL and (label_col or multi_graph):
+                leg_col = label_col or "algo"
+                if multi_graph and has_algo and "graph_file" in sp.columns:
+                    sp = sp.copy()
+                    sp["_legend"] = (
+                        sp["graph_file"].astype(str) + " · " + sp["algo"].astype(str)
+                    )
+                    leg_col = "_legend"
+                plot_speedup(sp, leg_col,
                              stem + "_speedup.png",
                              f"Speedup — {os.path.basename(path)}")
 
