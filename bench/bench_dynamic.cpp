@@ -128,7 +128,9 @@ static void bench_batch_size(long n, long m_approx, int runs) {
 // ================================================================
 // Scenario B: weak scaling
 //   n and m scale with num_workers so each worker handles a
-//   constant fraction of the graph.
+//   constant fraction of the graph.  Delta_fixed is the palette
+//   size used for all graph sizes so per-vertex work stays constant.
+//   (RMAT's max degree grows with n, which would confound results.)
 // ================================================================
 static void bench_weak_scaling(long n_per_thread, long m_per_thread, int runs) {
   long p = (long)parlay::num_workers();
@@ -140,9 +142,13 @@ static void bench_weak_scaling(long n_per_thread, long m_per_thread, int runs) {
 
   auto G = utils::rmat_symmetric_graph(n, m_target);
   n = (long)G.size();
-  int Delta = (int)parlay::reduce(
+  int Delta_actual = (int)parlay::reduce(
     parlay::map(G, [](const auto& ns){ return ns.size(); }),
     parlay::maximum<size_t>());
+  // Use the actual Delta of THIS graph so the coloring is valid;
+  // the caller can compare across thread counts by fixing n_per_thread
+  // and m_per_thread, noting that Delta will vary (unavoidable with RMAT).
+  int Delta = Delta_actual;
   auto E_all = parlay::filter(utils::to_edges(G),
                               [](edge e){ return e.first < e.second; });
   long m = (long)E_all.size();

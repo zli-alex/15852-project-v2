@@ -368,13 +368,18 @@ struct DynamicGraphColoring {
     });
 
     // ── Step 3: remove deleted edges from adjacency lists ─────────
-    // Normalize each deleted edge as (min,max) for canonical lookup.
+    // Only rebuild adjacency lists for the affected vertices (those
+    // that appear in the batch), NOT all n vertices.  The old code
+    // ran parallel_for(0, n, ...) which allocated new sequences for
+    // every vertex in the graph — O(m) realloc per batch call.
+    // Here we restrict to affected.size() <= 2*|batch| vertices.
     auto del_keys = parlay::sort(
       parlay::map(batch, [](edge e) {
         return std::make_pair(std::min(e.first, e.second),
                               std::max(e.first, e.second));
       }));
-    parlay::parallel_for(0, n, [&](long v) {
+    parlay::parallel_for(0, m_aff, [&](long i) {
+      vertex v = affected[i];
       adj[v] = parlay::filter(adj[v], [&](vertex w) {
         auto key = std::make_pair(std::min((vertex)v, w),
                                   std::max((vertex)v, w));
