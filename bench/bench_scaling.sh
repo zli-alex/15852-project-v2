@@ -75,8 +75,16 @@ echo ""
 for t in $THREADS; do
   echo "--- threads=$t ---"
 
+  # If NUMA_NODE is set, pin via numactl (eliminates cross-socket penalty).
+  # Example: NUMA_NODE=0 bash bench/bench_scaling.sh ./bench_static ...
+  if [[ -n "${NUMA_NODE:-}" ]] && command -v numactl &>/dev/null; then
+    RUNNER="numactl --cpunodebind=${NUMA_NODE} --membind=${NUMA_NODE}"
+  else
+    RUNNER=""
+  fi
+
   # Run the binary, capture stdout; stderr goes to terminal.
-  raw_output=$(PARLAY_NUM_THREADS=$t "$BINARY" "${BINARY_ARGS[@]:-}" 2>&1)
+  raw_output=$(PARLAY_NUM_THREADS=$t $RUNNER "$BINARY" "${BINARY_ARGS[@]:-}" 2>&1)
   echo "$raw_output"
 
   # Extract RESULT lines and convert to CSV rows.

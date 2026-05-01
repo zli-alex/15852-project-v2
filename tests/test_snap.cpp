@@ -6,7 +6,8 @@
 #include <parlay/internal/get_time.h>
 
 #include "../dynamic_graph_color.h"
-#include "helper/graph_utils.h"
+// snap_loader.h pulls helper/graph_utils.h (only once — graph_utils.h
+// has no include guard, so do not include it again here).
 #include "snap_loader.h"
 
 // ================================================================
@@ -29,7 +30,7 @@
 //   com-youtube.ungraph.txt 1.13M / 2.99M
 // ================================================================
 
-using utils = graph_utils<vertex>;
+// graph_utils<vertex> alias `utils` is defined in snap_loader.h.
 
 // ================================================================
 // Correctness checker
